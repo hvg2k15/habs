@@ -1,0 +1,79 @@
+package com.habs.domain.usecase
+
+import com.habs.domain.model.Habit
+import com.habs.domain.model.HabitStats
+import com.habs.domain.model.HabitWithCompletion
+import com.habs.domain.model.OverallStats
+import com.habs.domain.repository.CalendarRepository
+import com.habs.domain.repository.HabitRepository
+import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
+import javax.inject.Inject
+
+class GetTodayHabitsUseCase @Inject constructor(
+    private val habitRepository: HabitRepository
+) {
+    operator fun invoke(): Flow<List<HabitWithCompletion>> =
+        habitRepository.getHabitsWithCompletionForDate(LocalDate.now())
+}
+
+class ToggleHabitCompletionUseCase @Inject constructor(
+    private val habitRepository: HabitRepository
+) {
+    suspend operator fun invoke(habitId: Long) =
+        habitRepository.toggleCompletion(habitId, LocalDate.now())
+}
+
+class AddHabitUseCase @Inject constructor(
+    private val habitRepository: HabitRepository,
+    private val calendarRepository: CalendarRepository
+) {
+    suspend operator fun invoke(habit: Habit): Result<Long> {
+        val id = habitRepository.insertHabit(habit)
+        if (habit.calendarSynced) {
+            calendarRepository.syncHabitToCalendar(habit.copy(id = id))
+        }
+        return Result.success(id)
+    }
+}
+
+class DeleteHabitUseCase @Inject constructor(
+    private val habitRepository: HabitRepository,
+    private val calendarRepository: CalendarRepository
+) {
+    suspend operator fun invoke(habit: Habit) {
+        habit.calendarEventId?.let { calendarRepository.removeHabitFromCalendar(it) }
+        habitRepository.deleteHabit(habit)
+    }
+}
+
+class GetHabitStatsUseCase @Inject constructor(
+    private val habitRepository: HabitRepository
+) {
+    suspend operator fun invoke(habitId: Long, fromDate: LocalDate = LocalDate.now().minusYears(1)): HabitStats =
+        habitRepository.getStatsForHabit(habitId, fromDate)
+}
+
+class GetOverallStatsUseCase @Inject constructor(
+    private val habitRepository: HabitRepository
+) {
+    suspend operator fun invoke(fromDate: LocalDate = LocalDate.now().withDayOfMonth(1)): OverallStats =
+        habitRepository.getOverallStats(fromDate)
+}
+
+class SyncHabitToCalendarUseCase @Inject constructor(
+    private val habitRepository: HabitRepository,
+    private val calendarRepository: CalendarRepository
+) {
+    suspend operator fun invoke(habit: Habit): Result<Unit> {
+        return if (habit.calendarSynced && habit.calendarEventId != null) {
+            calendarRepository.removeHabitFromCalendar(habit.calendarEventId)
+            habitRepository.updateHabit(habit.copy(calendarSynced = false, calendarEventId = null))
+            Result.success(Unit)
+        } else {
+            calendarRepository.syncHabitToCalendar(habit).map { eventId ->
+                habitRepository.updateHabit(habit.copy(calendarSynced = true, calendarEventId = eventId))
+            }
+        }
+    }
+}
