@@ -26,6 +26,7 @@ import com.habs.domain.model.Habit
 import com.habs.domain.repository.CalendarRepository
 import com.habs.domain.repository.HabitRepository
 import com.habs.domain.usecase.SyncHabitToCalendarUseCase
+import com.habs.presentation.theme.habsTonalTopAppBarColors
 import com.habs.presentation.today.HabsBottomBar
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -173,6 +174,7 @@ fun CalendarScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             TopAppBar(
                 title = { Text("Google Calendar") },
@@ -185,17 +187,14 @@ fun CalendarScreen(
                     if (uiState.isSignedIn) {
                         IconButton(onClick = { viewModel.syncAll() }) {
                             Icon(
-                                Icons.Default.Sync, "Sync all",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                Icons.Default.Sync,
+                                contentDescription = "Sync all",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors = habsTonalTopAppBarColors()
             )
         },
         bottomBar = {

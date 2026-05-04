@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.habs.domain.model.HabitStats
 import com.habs.domain.model.OverallStats
+import com.habs.presentation.theme.habsTonalTopAppBarColors
 import com.habs.presentation.today.HabsBottomBar
 import java.time.LocalDate
 import java.time.YearMonth
@@ -40,6 +41,7 @@ fun StatsScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             TopAppBar(
                 title = { Text("Stats") },
@@ -48,11 +50,7 @@ fun StatsScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors = habsTonalTopAppBarColors()
             )
         },
         bottomBar = {
@@ -66,26 +64,25 @@ fun StatsScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            TabRow(
-                selectedTabIndex = uiState.period.ordinal,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
+            SecondaryTabRow(selectedTabIndex = uiState.period.ordinal) {
                 Tab(
                     selected = uiState.period == StatsPeriod.MONTHLY,
                     onClick = { viewModel.setPeriod(StatsPeriod.MONTHLY) },
-                    text = { Text("Monthly", color = MaterialTheme.colorScheme.onPrimary) }
+                    text = { Text("Monthly") }
                 )
                 Tab(
                     selected = uiState.period == StatsPeriod.YEARLY,
                     onClick = { viewModel.setPeriod(StatsPeriod.YEARLY) },
-                    text = { Text("Yearly", color = MaterialTheme.colorScheme.onPrimary) }
+                    text = { Text("Yearly") }
                 )
             }
 
             if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                    )
                 }
             } else {
                 LazyColumn(

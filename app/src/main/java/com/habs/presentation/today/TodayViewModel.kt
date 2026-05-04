@@ -2,11 +2,18 @@ package com.habs.presentation.today
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habs.data.repository.UserPreferencesRepository
 import com.habs.domain.model.Habit
 import com.habs.domain.model.HabitWithCompletion
 import com.habs.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,11 +31,20 @@ class TodayViewModel @Inject constructor(
     private val toggleCompletion: ToggleHabitCompletionUseCase,
     private val addHabit: AddHabitUseCase,
     private val deleteHabit: DeleteHabitUseCase,
-    private val syncToCalendar: SyncHabitToCalendarUseCase
+    private val syncToCalendar: SyncHabitToCalendarUseCase,
+    userPreferences: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TodayUiState())
     val uiState: StateFlow<TodayUiState> = _uiState.asStateFlow()
+
+    /** Default “Sync to Google Calendar” when opening the new-habit sheet (Settings: auto-sync). */
+    val calendarAutoSyncNewHabits: StateFlow<Boolean> =
+        userPreferences.calendarAutoSyncNewHabits.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            true
+        )
 
     init {
         viewModelScope.launch {

@@ -5,25 +5,22 @@ import android.content.Context
 import android.content.Intent
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Tasks
 import com.google.api.services.calendar.CalendarScopes
+import com.habs.data.preferences.habsPreferencesDataStore
 import com.habs.data.remote.GoogleCalendarApi
 import com.habs.domain.model.Habit
 import com.habs.domain.repository.CalendarRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore by preferencesDataStore("habs_prefs")
 private val ACCOUNT_KEY = stringPreferencesKey("google_account")
 
 @Singleton
@@ -51,7 +48,7 @@ class CalendarRepositoryImpl @Inject constructor(
      */
     private suspend fun resolveAccountEmail(): String? = withContext(Dispatchers.IO) {
         val last = GoogleSignIn.getLastSignedInAccount(context) ?: run {
-            context.dataStore.edit { it.remove(ACCOUNT_KEY) }
+            context.habsPreferencesDataStore.edit { it.remove(ACCOUNT_KEY) }
             return@withContext null
         }
         if (!GoogleSignIn.hasPermissions(last, calendarScope())) {
@@ -59,7 +56,7 @@ class CalendarRepositoryImpl @Inject constructor(
         }
         val email = last.email ?: return@withContext null
         calendarApi.setAccount(email)
-        context.dataStore.edit { prefs -> prefs[ACCOUNT_KEY] = email }
+        context.habsPreferencesDataStore.edit { prefs -> prefs[ACCOUNT_KEY] = email }
         email
     }
 
@@ -80,7 +77,7 @@ class CalendarRepositoryImpl @Inject constructor(
                     )
                 }
                 calendarApi.setAccount(email)
-                context.dataStore.edit { prefs -> prefs[ACCOUNT_KEY] = email }
+                context.habsPreferencesDataStore.edit { prefs -> prefs[ACCOUNT_KEY] = email }
                 Result.success(Unit)
             } catch (e: ApiException) {
                 Result.failure(e)
@@ -96,7 +93,7 @@ class CalendarRepositoryImpl @Inject constructor(
             } catch (_: Exception) {
                 // Still clear local prefs if sign-out fails
             }
-            context.dataStore.edit { it.remove(ACCOUNT_KEY) }
+            context.habsPreferencesDataStore.edit { it.remove(ACCOUNT_KEY) }
         }
     }
 

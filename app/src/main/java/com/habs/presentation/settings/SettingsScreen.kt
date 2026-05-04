@@ -11,16 +11,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.habs.presentation.theme.habsTonalTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateBack: () -> Unit) {
+fun SettingsScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
     var notificationsEnabled by remember { mutableStateOf(true) }
     var dailyReminderTime by remember { mutableStateOf("08:00 AM") }
-    var calendarAutoSync by remember { mutableStateOf(false) }
+    val calendarAutoSync by viewModel.calendarAutoSyncNewHabits.collectAsState()
     var weekStartsMonday by remember { mutableStateOf(true) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -29,11 +35,7 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors = habsTonalTopAppBarColors()
             )
         }
     ) { padding ->
@@ -76,7 +78,7 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                         title = "Auto-sync new habits",
                         subtitle = "Automatically sync habits to Calendar when added",
                         checked = calendarAutoSync,
-                        onCheckedChange = { calendarAutoSync = it }
+                        onCheckedChange = { viewModel.setCalendarAutoSyncNewHabits(it) }
                     )
                 }
             }

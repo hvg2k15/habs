@@ -14,13 +14,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.habs.domain.model.Frequency
 import com.habs.domain.model.Habit
 import com.habs.domain.model.HabitWithCompletion
+import com.habs.presentation.theme.habsTonalTopAppBarColors
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -33,9 +36,11 @@ fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val calendarSyncDefault by viewModel.calendarAutoSyncNewHabits.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             TodayTopBar(
                 completedCount = uiState.completedCount,
@@ -47,8 +52,14 @@ fun TodayScreen(
                 onClick = { showAddSheet = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = "Add habit") },
                 text = { Text("New habit") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                expanded = true,
+                shape = MaterialTheme.shapes.large,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 4.dp,
+                    pressedElevation = 6.dp
+                ),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         },
         bottomBar = {
@@ -68,9 +79,10 @@ fun TodayScreen(
                 }
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     action = {
                         TextButton(onClick = { viewModel.dismissToast() }) {
-                            Text("Dismiss", color = MaterialTheme.colorScheme.primaryContainer)
+                            Text("Dismiss", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 ) { Text(msg) }
@@ -79,7 +91,10 @@ fun TodayScreen(
     ) { padding ->
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             }
         } else {
             LazyColumn(
@@ -98,10 +113,10 @@ fun TodayScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Today's habits",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.8.sp
+                        letterSpacing = 0.2.sp
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -119,15 +134,32 @@ fun TodayScreen(
                             Modifier.fillMaxWidth().padding(top = 48.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("🌱", fontSize = 48.sp)
-                                Spacer(Modifier.height(12.dp))
-                                Text("No habits yet", style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "Tap + to add your first habit",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                ),
+                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(
+                                    Modifier.padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("🌱", fontSize = 52.sp)
+                                    Spacer(Modifier.height(16.dp))
+                                    Text(
+                                        "No habits yet",
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Tap New habit to get started",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     }
@@ -138,6 +170,7 @@ fun TodayScreen(
 
     if (showAddSheet) {
         AddHabitBottomSheet(
+            defaultCalendarSynced = calendarSyncDefault,
             onDismiss = { showAddSheet = false },
             onSave = { habit ->
                 viewModel.addNewHabit(habit)
@@ -154,63 +187,80 @@ fun TodayTopBar(completedCount: Int, totalCount: Int) {
     TopAppBar(
         title = {
             Column {
-                Text("Habs", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "Habs",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Text(
                     today,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         actions = {
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 1.dp
             ) {
                 Text(
                     "🔥 $completedCount/$totalCount",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            titleContentColor = MaterialTheme.colorScheme.onPrimary
-        )
+        colors = habsTonalTopAppBarColors()
     )
 }
 
 @Composable
 fun ProgressSection(completed: Int, total: Int) {
     val progress = if (total > 0) completed.toFloat() / total else 0f
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
-        Text(
-            "Today's progress",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            "$completed / $total",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold
-        )
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Today's progress",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "$completed / $total",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(MaterialTheme.shapes.small),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                strokeCap = StrokeCap.Round
+            )
+        }
     }
-    Spacer(Modifier.height(6.dp))
-    LinearProgressIndicator(
-        progress = { progress },
-        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-        color = MaterialTheme.colorScheme.primary,
-        trackColor = MaterialTheme.colorScheme.primaryContainer
-    )
 }
 
 @Composable
@@ -228,16 +278,18 @@ fun HabitCard(
         MaterialTheme.colorScheme.primary
     }
 
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -247,9 +299,9 @@ fun HabitCard(
             )
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color.copy(alpha = 0.12f)),
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(color.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(habit.icon, fontSize = 22.sp)
@@ -257,7 +309,7 @@ fun HabitCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     habit.name,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     color = if (done) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.onSurface
@@ -286,10 +338,11 @@ fun HabitCard(
             }
             FilledIconButton(
                 onClick = onToggle,
-                modifier = Modifier.size(34.dp),
+                modifier = Modifier.size(40.dp),
+                shape = MaterialTheme.shapes.medium,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = if (done) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant,
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = if (done) MaterialTheme.colorScheme.onPrimary
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -297,7 +350,7 @@ fun HabitCard(
                 if (done) Icon(
                     Icons.Default.Check,
                     contentDescription = "Done",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -306,17 +359,25 @@ fun HabitCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddHabitBottomSheet(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
+fun AddHabitBottomSheet(
+    defaultCalendarSynced: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Habit) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var selectedIcon by remember { mutableStateOf("🏃") }
     var selectedFrequency by remember { mutableStateOf(Frequency.DAILY) }
-    var calendarSync by remember { mutableStateOf(true) }
+    var calendarSync by remember(defaultCalendarSynced) { mutableStateOf(defaultCalendarSynced) }
 
     val icons = listOf("🏃", "💧", "📖", "🧘", "💪", "🎵", "✍️", "🥗", "😴", "🧹")
     val colors = listOf("#6750A4", "#1565C0", "#2E7D32", "#AD1457", "#E65100", "#00695C")
     var selectedColor by remember { mutableStateOf(colors.first()) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -440,7 +501,7 @@ fun AddHabitBottomSheet(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(26.dp),
+                shape = MaterialTheme.shapes.large,
                 enabled = name.isNotBlank()
             ) { Text("Save habit", fontWeight = FontWeight.SemiBold) }
         }
@@ -455,7 +516,10 @@ fun HabsBottomBar(
     onNavigateToCalendar: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
         NavigationBarItem(
             selected = selectedIndex == 0,
             onClick = onNavigateToToday,
