@@ -1,0 +1,50 @@
+# Gradle
+.gradle/
+**/build/
+!**/src/**/build/
+
+# Local machine / secrets
+local.properties
+*.jks
+*.keystore
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Kotlin
+.kotlin/
+
+# Android packaging
+*.apk
+*.aar
+*.aab
+*.ap_
+*.dex
+
+# NDK / CMake
+.externalNativeBuild/
+.cxx/
+
+# Captures / profiling
+captures/
+*.hprof
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+*.swp
+*~
+
+# Fastlane (if added later)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
