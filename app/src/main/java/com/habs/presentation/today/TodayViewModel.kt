@@ -53,10 +53,17 @@ class TodayViewModel @Inject constructor(
 
     fun addNewHabit(habit: Habit) {
         viewModelScope.launch {
-            addHabit(habit).onSuccess {
-                val msg = if (habit.calendarSynced) "\"${habit.name}\" added & synced to Calendar"
-                else "\"${habit.name}\" added"
+            addHabit(habit).onSuccess { outcome ->
+                val msg = buildString {
+                    append("\"${habit.name}\" added")
+                    if (habit.calendarSynced && outcome.calendarSyncWarning == null) {
+                        append(" — synced to Google Calendar")
+                    }
+                    outcome.calendarSyncWarning?.let { append(". ").append(it) }
+                }
                 showToast(msg)
+            }.onFailure { e ->
+                showToast(e.message ?: "Could not add habit")
             }
         }
     }

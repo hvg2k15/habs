@@ -30,12 +30,16 @@ data class HabitWithCompletion(
 
 data class HabitStats(
     val habit: Habit,
-    val completionRate: Float,          // 0.0 - 1.0
+    val completionRate: Float,          // 0.0 - 1.0 (scheduled days in period only)
     val currentStreak: Int,
     val longestStreak: Int,
     val totalCompletions: Int,
     val monthlyRates: Map<String, Float>,  // "yyyy-MM" -> rate
-    val dailyCompletions: Map<String, Boolean>  // "yyyy-MM-dd" -> done
+    val dailyCompletions: Map<String, Boolean>,  // "yyyy-MM-dd" -> done
+    /** Scheduled habit days from the stats range start through today */
+    val scheduledDaysInPeriod: Int,
+    /** Scheduled days in that range with no check-in */
+    val missedScheduledDays: Int
 )
 
 data class OverallStats(

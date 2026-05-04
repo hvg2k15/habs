@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import javax.inject.Inject
 
+data class AddHabitResult(val habitId: Long, val calendarSyncWarning: String? = null)
+
 class GetTodayHabitsUseCase @Inject constructor(
     private val habitRepository: HabitRepository
 ) {
@@ -24,16 +26,47 @@ class ToggleHabitCompletionUseCase @Inject constructor(
         habitRepository.toggleCompletion(habitId, LocalDate.now())
 }
 
-class AddHabitUseCase @Inject constructor(
+class SyncHabitToCalendarUseCase @Inject constructor(
     private val habitRepository: HabitRepository,
     private val calendarRepository: CalendarRepository
 ) {
-    suspend operator fun invoke(habit: Habit): Result<Long> {
-        val id = habitRepository.insertHabit(habit)
-        if (habit.calendarSynced) {
-            calendarRepository.syncHabitToCalendar(habit.copy(id = id))
+    suspend operator fun invoke(habit: Habit): Result<Unit> {
+        return if (habit.calendarSynced && habit.calendarEventId != null) {
+            calendarRepository.removeHabitFromCalendar(habit.calendarEventId)
+            habitRepository.updateHabit(habit.copy(calendarSynced = false, calendarEventId = null))
+            Result.success(Unit)
+        } else {
+            calendarRepository.syncHabitToCalendar(habit).map { eventId ->
+                habitRepository.updateHabit(habit.copy(calendarSynced = true, calendarEventId = eventId))
+            }
         }
-        return Result.success(id)
+    }
+}
+
+class AddHabitUseCase @Inject constructor(
+    private val habitRepository: HabitRepository,
+    private val syncHabitToCalendar: SyncHabitToCalendarUseCase
+) {
+    suspend operator fun invoke(habit: Habit): Result<AddHabitResult> {
+        val id = habitRepository.insertHabit(habit)
+        val stored = habit.copy(id = id)
+        if (!habit.calendarSynced) {
+            return Result.success(AddHabitResult(habitId = id))
+        }
+        return syncHabitToCalendar(stored).fold(
+            onSuccess = { Result.success(AddHabitResult(habitId = id)) },
+            onFailure = { e ->
+                habitRepository.updateHabit(
+                    stored.copy(calendarSynced = false, calendarEventId = null)
+                )
+                Result.success(
+                    AddHabitResult(
+                        habitId = id,
+                        calendarSyncWarning = e.message ?: "Calendar sync failed"
+                    )
+                )
+            }
+        )
     }
 }
 
@@ -59,21 +92,4 @@ class GetOverallStatsUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(fromDate: LocalDate = LocalDate.now().withDayOfMonth(1)): OverallStats =
         habitRepository.getOverallStats(fromDate)
-}
-
-class SyncHabitToCalendarUseCase @Inject constructor(
-    private val habitRepository: HabitRepository,
-    private val calendarRepository: CalendarRepository
-) {
-    suspend operator fun invoke(habit: Habit): Result<Unit> {
-        return if (habit.calendarSynced && habit.calendarEventId != null) {
-            calendarRepository.removeHabitFromCalendar(habit.calendarEventId)
-            habitRepository.updateHabit(habit.copy(calendarSynced = false, calendarEventId = null))
-            Result.success(Unit)
-        } else {
-            calendarRepository.syncHabitToCalendar(habit).map { eventId ->
-                habitRepository.updateHabit(habit.copy(calendarSynced = true, calendarEventId = eventId))
-            }
-        }
-    }
 }

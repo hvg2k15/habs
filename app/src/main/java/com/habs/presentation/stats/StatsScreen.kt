@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,7 +95,17 @@ fun StatsScreen(
                 ) {
                     uiState.overallStats?.let { stats ->
                         item { MetricGrid(stats) }
-                        item { HabitCompletionBars(uiState.habitStats) }
+                        item {
+                            NeedsAttentionCard(
+                                period = uiState.period,
+                                habitStats = uiState.habitStats
+                            )
+                        }
+                        item {
+                            HabitCompletionBars(
+                                uiState.habitStats.sortedBy { it.completionRate }
+                            )
+                        }
                         if (uiState.period == StatsPeriod.YEARLY) {
                             item { YearlyBarChart(stats) }
                         }
@@ -112,6 +123,130 @@ fun StatsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NeedsAttentionCard(
+    period: StatsPeriod,
+    habitStats: List<HabitStats>
+) {
+    if (habitStats.isEmpty()) return
+
+    val slipping = remember(habitStats) {
+        habitStats
+            .filter { it.scheduledDaysInPeriod > 0 && it.missedScheduledDays > 0 }
+            .sortedWith(
+                compareBy<HabitStats> { it.completionRate }
+                    .thenByDescending { it.missedScheduledDays }
+            )
+            .take(5)
+    }
+    val periodLabel = when (period) {
+        StatsPeriod.MONTHLY -> "this month"
+        StatsPeriod.YEARLY -> "this year"
+    }
+    val hasScheduledDays = habitStats.any { it.scheduledDaysInPeriod > 0 }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+        ),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    "Needs attention",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                "Habits you miss most on scheduled days ($periodLabel).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+
+            when {
+                !hasScheduledDays -> {
+                    Text(
+                        "No scheduled habit days in this range yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                slipping.isEmpty() -> {
+                    Text(
+                        "You have not missed a scheduled day — great consistency.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                else -> {
+                    slipping.forEachIndexed { index, s ->
+                        val pct = (s.completionRate * 100).toInt()
+                        val habitColor = try {
+                            Color(android.graphics.Color.parseColor(s.habit.colorHex))
+                        } catch (_: Exception) {
+                            MaterialTheme.colorScheme.primary
+                        }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(s.habit.icon, fontSize = 20.sp)
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    s.habit.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "Missed ${s.missedScheduledDays} of ${s.scheduledDaysInPeriod} scheduled days",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    "$pct%",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = habitColor
+                                )
+                                Text(
+                                    "${s.currentStreak}d streak",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (index < slipping.lastIndex) {
+                            Divider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
                         }
                     }
                 }
@@ -168,6 +303,12 @@ fun HabitCompletionBars(habitStats: List<HabitStats>) {
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium
             )
+            Text(
+                "Worst to best in the selected period (missed scheduled days lower your %).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
             Spacer(Modifier.height(12.dp))
             habitStats.forEach { stats ->
                 val color = try {

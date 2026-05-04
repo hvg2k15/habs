@@ -1,6 +1,8 @@
 package com.habs.presentation.calendar
 
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +27,7 @@ import com.habs.domain.repository.CalendarRepository
 import com.habs.domain.repository.HabitRepository
 import com.habs.domain.usecase.SyncHabitToCalendarUseCase
 import com.habs.presentation.today.HabsBottomBar
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -68,14 +71,45 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    fun signIn(activity: Activity) {
+    fun calendarSignInIntent(activity: Activity) =
+        calendarRepository.calendarSignInIntent(activity)
+
+    fun onCalendarSignInResult(data: android.content.Intent?) {
         viewModelScope.launch {
+            // Do not require activity result RESULT_OK — some devices/Play Services return other codes
+            // while still sending an Intent; Google recommends parsing via getSignedInAccountFromIntent.
+            if (data == null) {
+                _uiState.update {
+                    it.copy(message = "No sign-in data from Google. Try again or update Google Play services.")
+                }
+                return@launch
+            }
             val result = withContext(Dispatchers.IO) {
-                runCatching { calendarRepository.signIn(activity) }.getOrElse { Result.failure(it) }
+                runCatching { calendarRepository.completeCalendarSignIn(data) }
+                    .getOrElse { Result.failure(it) }
             }
             result
-                .onSuccess { _uiState.update { it.copy(isSignedIn = true, message = "Signed in to Google") } }
-                .onFailure { _uiState.update { it.copy(message = "Sign-in failed: ${it.message}") } }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(isSignedIn = true, message = "Signed in — habits sync to your calendar")
+                    }
+                }
+                .onFailure { e ->
+                    val api = e as? com.google.android.gms.common.api.ApiException
+                    val msg = when (api?.statusCode) {
+                        GoogleSignInStatusCodes.SIGN_IN_CANCELLED ->
+                            "Sign-in was cancelled."
+                        com.google.android.gms.common.ConnectionResult.NETWORK_ERROR ->
+                            "Network error — check connection and try again"
+                        com.google.android.gms.common.api.CommonStatusCodes.DEVELOPER_ERROR ->
+                            "Developer error (10): In Google Cloud → APIs & Services → Credentials, " +
+                                "create an Android OAuth client with package com.habs and your app’s SHA-1 " +
+                                "(run ./gradlew signingReport). Enable the Google Calendar API for the project."
+                        else -> api?.let { "Sign-in failed (${it.statusCode}): ${e.message}" }
+                            ?: "Sign-in failed: ${e.message}"
+                    }
+                    _uiState.update { it.copy(message = msg) }
+                }
         }
     }
 
@@ -131,6 +165,12 @@ fun CalendarScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val activity = LocalContext.current as? Activity
+
+    val calendarSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.onCalendarSignInResult(result.data)
+    }
 
     Scaffold(
         topBar = {
@@ -190,7 +230,11 @@ fun CalendarScreen(
                 item {
                     AuthCard(
                         isSignedIn = uiState.isSignedIn,
-                        onSignIn = { activity?.let { viewModel.signIn(it) } },
+                        onSignIn = {
+                            activity?.let { a ->
+                                calendarSignInLauncher.launch(viewModel.calendarSignInIntent(a))
+                            }
+                        },
                         onSignOut = { viewModel.signOut() }
                     )
                 }
@@ -237,8 +281,8 @@ fun AuthCard(isSignedIn: Boolean, onSignIn: () -> Unit, onSignOut: () -> Unit) {
                         style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium
                     )
                     Text(
-                        if (isSignedIn) "Your habits sync automatically"
-                        else "Sign in to sync habits as recurring events",
+                        if (isSignedIn) "Turn habits on below to add recurring calendar events"
+                        else "Sign in, then enable each habit to create recurring events on your calendar",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

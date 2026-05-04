@@ -58,7 +58,7 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                         onCheckedChange = { notificationsEnabled = it }
                     )
                     if (notificationsEnabled) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         SettingsInfoRow(
                             icon = Icons.Default.Schedule,
                             title = "Reminder time",
@@ -102,7 +102,7 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                         title = "Version",
                         value = "1.0.0"
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsInfoRow(
                         icon = Icons.Default.Code,
                         title = "Package",

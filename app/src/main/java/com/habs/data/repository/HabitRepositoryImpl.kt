@@ -83,7 +83,13 @@ class HabitRepositoryImpl @Inject constructor(
             val d = fromDate.plusDays(offset.toLong())
             habit.frequency.isScheduledFor(d.dayOfWeek)
         }
-        val completionRate = if (scheduledDays > 0) completions.size.toFloat() / scheduledDays else 0f
+        val completedScheduledInPeriod = (0 until totalDays).count { offset ->
+            val d = fromDate.plusDays(offset.toLong())
+            habit.frequency.isScheduledFor(d.dayOfWeek) && d.format(DATE_FMT) in completedDates
+        }
+        val missedScheduled = (scheduledDays - completedScheduledInPeriod).coerceAtLeast(0)
+        val completionRate =
+            if (scheduledDays > 0) completedScheduledInPeriod.toFloat() / scheduledDays else 0f
         val dailyMap = completedDates.associateWith { true }
         val monthlyRates = buildMonthlyRates(habit, completedDates, fromDate, today)
 
@@ -94,7 +100,9 @@ class HabitRepositoryImpl @Inject constructor(
             longestStreak = calculateLongestStreak(habit, completedDates),
             totalCompletions = completions.size,
             monthlyRates = monthlyRates,
-            dailyCompletions = dailyMap
+            dailyCompletions = dailyMap,
+            scheduledDaysInPeriod = scheduledDays,
+            missedScheduledDays = missedScheduled
         )
     }
 

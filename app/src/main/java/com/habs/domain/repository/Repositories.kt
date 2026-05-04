@@ -26,6 +26,8 @@ interface CalendarRepository {
     suspend fun removeHabitFromCalendar(calendarEventId: String): Result<Unit>
     suspend fun updateCalendarEvent(habit: Habit): Result<Unit>
     suspend fun isSignedIn(): Boolean
-    suspend fun signIn(activity: android.app.Activity): Result<Unit>
+    /** Intent for [androidx.activity.result.ActivityResultContracts.StartActivityForResult]. */
+    fun calendarSignInIntent(activity: android.app.Activity): android.content.Intent
+    suspend fun completeCalendarSignIn(data: android.content.Intent?): Result<Unit>
     suspend fun signOut()
 }

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Habs</string>
+    <!-- Used when assets/google-services.json is missing. Prefer OAuth type “Web application” in Google Cloud; “installed/desktop” IDs sometimes fail for requestIdToken. -->
+    <string name="default_web_client_id" translatable="false">564340192332-edajmkoe9rvrrd0c348n8bsbdhfdmn31.apps.googleusercontent.com</string>
 </resources>

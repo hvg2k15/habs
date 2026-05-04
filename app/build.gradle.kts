@@ -6,6 +6,15 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Package google-services.json into the APK so OAuth client IDs are available at runtime.
+val copyGoogleServicesJsonToAssets = tasks.register<Copy>("copyGoogleServicesJsonToAssets") {
+    val src = layout.projectDirectory.file("google-services.json")
+    onlyIf { src.asFile.exists() }
+    from(src)
+    into(layout.projectDirectory.dir("src/main/assets"))
+}
+tasks.named("preBuild").configure { dependsOn(copyGoogleServicesJsonToAssets) }
+
 android {
     namespace = "com.habs"
     compileSdk = 34
@@ -78,6 +87,7 @@ dependencies {
     implementation(libs.coroutines.android)
 
     implementation(libs.google.api.client.android)
+    implementation(libs.google.http.client.android)
     implementation(libs.google.api.services.calendar)
     implementation(libs.google.auth.oauth2)
     implementation(libs.play.services.auth)

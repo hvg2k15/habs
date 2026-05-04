@@ -3,6 +3,9 @@
 **/build/
 !**/src/**/build/
 
+# Generated from app/google-services.json for packaged OAuth config (see app/build.gradle.kts)
+app/src/main/assets/google-services.json
+
 # Local machine / secrets
 local.properties
 *.jks
