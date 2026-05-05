@@ -3,18 +3,22 @@ package com.habs.worker
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.habs.domain.repository.CalendarRepository
 import com.habs.domain.repository.HabitRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.habs.domain.repository.TaskRepository
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
 
-class CalendarSyncWorker(
-    context: Context,
-    workerParams: WorkerParameters,
+@HiltWorker
+class CalendarSyncWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted workerParams: WorkerParameters,
     private val habitRepository: HabitRepository,
+    private val taskRepository: TaskRepository,
     private val calendarRepository: CalendarRepository
 ) : CoroutineWorker(context, workerParams) {
 
@@ -24,6 +28,10 @@ class CalendarSyncWorker(
             val habits = habitRepository.getAllHabits().first()
             habits.filter { it.calendarSynced && it.calendarEventId != null }.forEach { habit ->
                 calendarRepository.updateCalendarEvent(habit)
+            }
+            val tasks = taskRepository.observeAllTasks().first()
+            tasks.filter { it.calendarSynced && it.calendarEventId != null }.forEach { task ->
+                calendarRepository.updateTaskCalendarEvent(task)
             }
             Result.success()
         } catch (e: Exception) {
@@ -43,19 +51,6 @@ class CalendarSyncWorker(
                 WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request
             )
         }
-    }
-}
-
-class CalendarSyncWorkerFactory @Inject constructor(
-    private val habitRepository: HabitRepository,
-    private val calendarRepository: CalendarRepository
-) : WorkerFactory() {
-    override fun createWorker(
-        appContext: Context, workerClassName: String, workerParameters: WorkerParameters
-    ) = when (workerClassName) {
-        CalendarSyncWorker::class.java.name ->
-            CalendarSyncWorker(appContext, workerParameters, habitRepository, calendarRepository)
-        else -> null
     }
 }
 

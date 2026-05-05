@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 import com.habs.domain.model.Frequency
 import com.habs.domain.model.Habit
 import com.habs.domain.model.HabitCompletion
+import com.habs.domain.model.Task
 import java.time.LocalTime
 
 @Entity(tableName = "habits")
@@ -16,7 +17,11 @@ data class HabitEntity(
     val icon: String,
     val colorHex: String,
     val frequency: String,
-    val reminderTimeMinutes: Int?,  // minutes from midnight, null = no reminder
+    /** ISO weekdays Mon=bit0 … Sun=bit6; null = use [frequency] only. */
+    val weeklyDayMask: Int? = null,
+    val repeatIntervalDays: Int? = null,
+    val repeatAnchorDateKey: String? = null,
+    val executionTimeMinutes: Int?,  // minutes from midnight, null = no preferred time
     val calendarSynced: Boolean = false,
     val calendarEventId: String? = null,
     val createdAt: Long = System.currentTimeMillis()
@@ -27,7 +32,10 @@ data class HabitEntity(
         icon = icon,
         colorHex = colorHex,
         frequency = Frequency.valueOf(frequency),
-        reminderTime = reminderTimeMinutes?.let { LocalTime.ofSecondOfDay(it * 60L) },
+        weeklyDayMask = weeklyDayMask,
+        repeatIntervalDays = repeatIntervalDays,
+        repeatAnchorDateKey = repeatAnchorDateKey,
+        executionTime = executionTimeMinutes?.let { LocalTime.ofSecondOfDay(it * 60L) },
         calendarSynced = calendarSynced,
         calendarEventId = calendarEventId,
         createdAt = createdAt
@@ -40,7 +48,10 @@ fun Habit.toEntity() = HabitEntity(
     icon = icon,
     colorHex = colorHex,
     frequency = frequency.name,
-    reminderTimeMinutes = reminderTime?.let { it.hour * 60 + it.minute },
+    weeklyDayMask = weeklyDayMask,
+    repeatIntervalDays = repeatIntervalDays,
+    repeatAnchorDateKey = repeatAnchorDateKey,
+    executionTimeMinutes = executionTime?.let { it.hour * 60 + it.minute },
     calendarSynced = calendarSynced,
     calendarEventId = calendarEventId,
     createdAt = createdAt
@@ -64,3 +75,43 @@ data class CompletionEntity(
 ) {
     fun toDomain() = HabitCompletion(id = id, habitId = habitId, completedAt = completedAt, dateKey = dateKey)
 }
+
+@Entity(
+    tableName = "tasks",
+    indices = [Index("dueDateKey"), Index("isCompleted")]
+)
+data class TaskEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val dueDateKey: String,
+    val dueTimeMinutes: Int? = null,
+    val isCompleted: Boolean = false,
+    val completedOnKey: String? = null,
+    val calendarSynced: Boolean = false,
+    val calendarEventId: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    fun toDomain() = Task(
+        id = id,
+        title = title,
+        dueDateKey = dueDateKey,
+        dueTime = dueTimeMinutes?.let { LocalTime.ofSecondOfDay(it * 60L) },
+        isCompleted = isCompleted,
+        completedOnKey = completedOnKey,
+        calendarSynced = calendarSynced,
+        calendarEventId = calendarEventId,
+        createdAt = createdAt
+    )
+}
+
+fun Task.toEntity() = TaskEntity(
+    id = id,
+    title = title,
+    dueDateKey = dueDateKey,
+    dueTimeMinutes = dueTime?.let { it.hour * 60 + it.minute },
+    isCompleted = isCompleted,
+    completedOnKey = completedOnKey,
+    calendarSynced = calendarSynced,
+    calendarEventId = calendarEventId,
+    createdAt = createdAt
+)

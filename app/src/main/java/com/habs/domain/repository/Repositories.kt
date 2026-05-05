@@ -5,6 +5,7 @@ import com.habs.domain.model.HabitCompletion
 import com.habs.domain.model.HabitStats
 import com.habs.domain.model.HabitWithCompletion
 import com.habs.domain.model.OverallStats
+import com.habs.domain.model.Task
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -16,7 +17,8 @@ interface HabitRepository {
     suspend fun updateHabit(habit: Habit)
     suspend fun deleteHabit(habit: Habit)
     suspend fun toggleCompletion(habitId: Long, date: LocalDate)
-    suspend fun getStatsForHabit(habitId: Long, fromDate: LocalDate): HabitStats
+    /** Inclusive date range [fromDate, toDate] (clamped to habit creation day where applicable). */
+    suspend fun getStatsForHabit(habitId: Long, fromDate: LocalDate, toDate: LocalDate): HabitStats
     suspend fun getOverallStats(fromDate: LocalDate): OverallStats
     fun getCompletionsForDateRange(from: LocalDate, to: LocalDate): Flow<List<HabitCompletion>>
 }
@@ -25,6 +27,9 @@ interface CalendarRepository {
     suspend fun syncHabitToCalendar(habit: Habit): Result<String>
     suspend fun removeHabitFromCalendar(calendarEventId: String): Result<Unit>
     suspend fun updateCalendarEvent(habit: Habit): Result<Unit>
+    suspend fun syncTaskToCalendar(task: Task): Result<String>
+    suspend fun removeTaskFromCalendar(calendarEventId: String): Result<Unit>
+    suspend fun updateTaskCalendarEvent(task: Task): Result<Unit>
     suspend fun isSignedIn(): Boolean
     /** Intent for [androidx.activity.result.ActivityResultContracts.StartActivityForResult]. */
     fun calendarSignInIntent(activity: android.app.Activity): android.content.Intent

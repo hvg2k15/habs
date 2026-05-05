@@ -25,7 +25,17 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { it[KEY_CALENDAR_AUTO_SYNC_NEW] = enabled }
     }
 
+    /** When true, new tasks default to “sync to Google Calendar” in the add-task sheet. Default on. */
+    val calendarAutoSyncNewTasks: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_CALENDAR_AUTO_SYNC_NEW_TASKS] ?: true
+    }
+
+    suspend fun setCalendarAutoSyncNewTasks(enabled: Boolean) {
+        dataStore.edit { it[KEY_CALENDAR_AUTO_SYNC_NEW_TASKS] = enabled }
+    }
+
     companion object {
         private val KEY_CALENDAR_AUTO_SYNC_NEW = booleanPreferencesKey("calendar_auto_sync_new_habits")
+        private val KEY_CALENDAR_AUTO_SYNC_NEW_TASKS = booleanPreferencesKey("calendar_auto_sync_new_tasks")
     }
 }

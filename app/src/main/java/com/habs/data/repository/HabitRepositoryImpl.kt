@@ -7,10 +7,12 @@ import com.habs.data.local.HabitEntity
 import com.habs.data.local.toEntity
 import com.habs.domain.model.*
 import com.habs.domain.repository.HabitRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -47,14 +49,18 @@ class HabitRepositoryImpl @Inject constructor(
             habitDao.getAllHabits(),
             completionDao.getCompletionsForDate(dateKey)
         ) { habits, completions ->
-            val completedIds = completions.map { it.habitId }.toSet()
-            habits
-                .filter { it.toDomain().frequency.isScheduledFor(date.dayOfWeek) }
-                .map { entity ->
-                    val habit = entity.toDomain()
-                    val streak = calculateStreak(habit.id, date)
-                    HabitWithCompletion(habit, habit.id in completedIds, streak)
-                }
+            withContext(Dispatchers.IO) {
+                val completedIds = completions.map { it.habitId }.toSet()
+                habits
+                    .map { it.toDomain() }
+                    .filter { habit ->
+                        !date.isBefore(habitCreatedLocalDate(habit)) && habit.isScheduledOn(date)
+                    }
+                    .map { habit ->
+                        val streak = calculateStreak(habit.id, date)
+                        HabitWithCompletion(habit, habit.id in completedIds, streak)
+                    }
+            }
         }
     }
 
@@ -72,26 +78,43 @@ class HabitRepositoryImpl @Inject constructor(
         completionDao.getCompletionsInRange(from.format(DATE_FMT), to.format(DATE_FMT))
             .map { list -> list.map { it.toDomain() } }
 
-    override suspend fun getStatsForHabit(habitId: Long, fromDate: LocalDate): HabitStats {
+    override suspend fun getStatsForHabit(habitId: Long, fromDate: LocalDate, toDate: LocalDate): HabitStats {
         val habit = habitDao.getHabitById(habitId)?.toDomain() ?: error("Habit not found: $habitId")
         val completions = completionDao.getCompletionsForHabit(habitId)
         val completedDates = completions.map { it.dateKey }.toSet()
 
         val today = LocalDate.now()
-        val totalDays = ChronoUnit.DAYS.between(fromDate, today).toInt() + 1
+        val habitStart = habitCreatedLocalDate(habit)
+        val effectiveStart =
+            if (habitStart.isAfter(fromDate)) habitStart else fromDate
+        val end = toDate
+        if (effectiveStart.isAfter(end)) {
+            return HabitStats(
+                habit = habit,
+                completionRate = 0f,
+                currentStreak = calculateStreak(habitId, today),
+                longestStreak = calculateLongestStreak(habit, completedDates),
+                totalCompletions = completions.size,
+                monthlyRates = buildMonthlyRates(habit, completedDates, effectiveStart, end),
+                dailyCompletions = completedDates.associateWith { true },
+                scheduledDaysInPeriod = 0,
+                missedScheduledDays = 0
+            )
+        }
+        val totalDays = ChronoUnit.DAYS.between(effectiveStart, end).toInt() + 1
         val scheduledDays = (0 until totalDays).count { offset ->
-            val d = fromDate.plusDays(offset.toLong())
-            habit.frequency.isScheduledFor(d.dayOfWeek)
+            val d = effectiveStart.plusDays(offset.toLong())
+            habit.isScheduledOn(d)
         }
         val completedScheduledInPeriod = (0 until totalDays).count { offset ->
-            val d = fromDate.plusDays(offset.toLong())
-            habit.frequency.isScheduledFor(d.dayOfWeek) && d.format(DATE_FMT) in completedDates
+            val d = effectiveStart.plusDays(offset.toLong())
+            habit.isScheduledOn(d) && d.format(DATE_FMT) in completedDates
         }
         val missedScheduled = (scheduledDays - completedScheduledInPeriod).coerceAtLeast(0)
         val completionRate =
             if (scheduledDays > 0) completedScheduledInPeriod.toFloat() / scheduledDays else 0f
         val dailyMap = completedDates.associateWith { true }
-        val monthlyRates = buildMonthlyRates(habit, completedDates, fromDate, today)
+        val monthlyRates = buildMonthlyRates(habit, completedDates, effectiveStart, end)
 
         return HabitStats(
             habit = habit,
@@ -131,7 +154,10 @@ class HabitRepositoryImpl @Inject constructor(
         (0 until totalDays).forEach { offset ->
             val d = fromDate.plusDays(offset.toLong())
             val dateKey = d.format(DATE_FMT)
-            val scheduledCount = habitsList.count { it.toDomain().frequency.isScheduledFor(d.dayOfWeek) }
+            val scheduledCount = habitsList.count { entity ->
+                val h = entity.toDomain()
+                !d.isBefore(habitCreatedLocalDate(h)) && h.isScheduledOn(d)
+            }
             val doneCount = completionDao.countCompletionsForDate(dateKey)
             if (scheduledCount > 0 && doneCount >= scheduledCount) perfectDays++
         }
@@ -155,8 +181,10 @@ class HabitRepositoryImpl @Inject constructor(
         val completedDates = completions.map { it.dateKey }.toSet()
         var streak = 0
         var current = upTo
-        while (true) {
-            if (!habit.frequency.isScheduledFor(current.dayOfWeek)) {
+        var guard = 0
+        while (guard++ < 4000) {
+            if (current.isBefore(habitCreatedLocalDate(habit))) break
+            if (!habit.isScheduledOn(current)) {
                 current = current.minusDays(1)
                 continue
             }
@@ -172,7 +200,9 @@ class HabitRepositoryImpl @Inject constructor(
 
     private fun calculateLongestStreak(habit: Habit, completedDates: Set<String>): Int {
         if (completedDates.isEmpty()) return 0
-        val sorted = completedDates.sorted()
+        val habitStartKey = habitCreatedLocalDate(habit).format(DATE_FMT)
+        val sorted = completedDates.filter { it >= habitStartKey }.sorted()
+        if (sorted.isEmpty()) return 0
         var longest = 1
         var current = 1
         for (i in 1 until sorted.size) {
@@ -203,7 +233,11 @@ class HabitRepositoryImpl @Inject constructor(
             var done = 0
             (1..daysInMonth).forEach { day ->
                 val d = month.withDayOfMonth(day)
-                if (!d.isAfter(to) && habit.frequency.isScheduledFor(d.dayOfWeek)) {
+                if (!d.isAfter(to) &&
+                    !d.isBefore(from) &&
+                    !d.isBefore(habitCreatedLocalDate(habit)) &&
+                    habit.isScheduledOn(d)
+                ) {
                     scheduled++
                     if (d.format(DATE_FMT) in completedDates) done++
                 }
@@ -231,7 +265,10 @@ class HabitRepositoryImpl @Inject constructor(
                 val d = month.withDayOfMonth(day)
                 if (!d.isAfter(to)) {
                     val dateKey = d.format(DATE_FMT)
-                    val scheduled = habits.count { it.toDomain().frequency.isScheduledFor(d.dayOfWeek) }
+                    val scheduled = habits.count { entity ->
+                        val h = entity.toDomain()
+                        !d.isBefore(habitCreatedLocalDate(h)) && h.isScheduledOn(d)
+                    }
                     val done = completionDao.countCompletionsForDate(dateKey)
                     totalCheckIns += done
                     totalScheduled += scheduled

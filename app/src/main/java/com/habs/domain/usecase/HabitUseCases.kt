@@ -15,15 +15,15 @@ data class AddHabitResult(val habitId: Long, val calendarSyncWarning: String? = 
 class GetTodayHabitsUseCase @Inject constructor(
     private val habitRepository: HabitRepository
 ) {
-    operator fun invoke(): Flow<List<HabitWithCompletion>> =
-        habitRepository.getHabitsWithCompletionForDate(LocalDate.now())
+    operator fun invoke(date: LocalDate = LocalDate.now()): Flow<List<HabitWithCompletion>> =
+        habitRepository.getHabitsWithCompletionForDate(date)
 }
 
 class ToggleHabitCompletionUseCase @Inject constructor(
     private val habitRepository: HabitRepository
 ) {
-    suspend operator fun invoke(habitId: Long) =
-        habitRepository.toggleCompletion(habitId, LocalDate.now())
+    suspend operator fun invoke(habitId: Long, date: LocalDate = LocalDate.now()) =
+        habitRepository.toggleCompletion(habitId, date)
 }
 
 class SyncHabitToCalendarUseCase @Inject constructor(
@@ -83,8 +83,12 @@ class DeleteHabitUseCase @Inject constructor(
 class GetHabitStatsUseCase @Inject constructor(
     private val habitRepository: HabitRepository
 ) {
-    suspend operator fun invoke(habitId: Long, fromDate: LocalDate = LocalDate.now().minusYears(1)): HabitStats =
-        habitRepository.getStatsForHabit(habitId, fromDate)
+    suspend operator fun invoke(
+        habitId: Long,
+        fromDate: LocalDate = LocalDate.now().minusYears(1),
+        toDate: LocalDate = LocalDate.now()
+    ): HabitStats =
+        habitRepository.getStatsForHabit(habitId, fromDate, toDate)
 }
 
 class GetOverallStatsUseCase @Inject constructor(

@@ -1,5 +1,8 @@
 package com.habs.presentation.settings
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,21 +12,34 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.habs.presentation.calendar.AuthCard
+import com.habs.presentation.calendar.CalendarViewModel
 import com.habs.presentation.theme.habsTonalTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    calendarViewModel: CalendarViewModel = hiltViewModel()
 ) {
     var notificationsEnabled by remember { mutableStateOf(true) }
     var dailyReminderTime by remember { mutableStateOf("08:00 AM") }
     val calendarAutoSync by viewModel.calendarAutoSyncNewHabits.collectAsState()
+    val calendarAutoSyncTasks by viewModel.calendarAutoSyncNewTasks.collectAsState()
+    val calendarUiState by calendarViewModel.uiState.collectAsState()
     var weekStartsMonday by remember { mutableStateOf(true) }
+
+    val activity = LocalContext.current as? Activity
+    val calendarSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        calendarViewModel.onCalendarSignInResult(result.data)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -37,6 +53,15 @@ fun SettingsScreen(
                 },
                 colors = habsTonalTopAppBarColors()
             )
+        },
+        snackbarHost = {
+            calendarUiState.message?.let { msg ->
+                LaunchedEffect(msg) {
+                    kotlinx.coroutines.delay(2800)
+                    calendarViewModel.dismissMessage()
+                }
+                Snackbar(modifier = Modifier.padding(16.dp)) { Text(msg) }
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -80,6 +105,62 @@ fun SettingsScreen(
                         checked = calendarAutoSync,
                         onCheckedChange = { viewModel.setCalendarAutoSyncNewHabits(it) }
                     )
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsToggleRow(
+                        icon = Icons.Default.Assignment,
+                        title = "Auto-sync new tasks",
+                        subtitle = "Automatically add new tasks as calendar events on their due date",
+                        checked = calendarAutoSyncTasks,
+                        onCheckedChange = { viewModel.setCalendarAutoSyncNewTasks(it) }
+                    )
+                }
+            }
+            item {
+                if (calendarUiState.isLoading) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AuthCard(
+                            isSignedIn = calendarUiState.isSignedIn,
+                            onSignIn = {
+                                activity?.let { a ->
+                                    calendarSignInLauncher.launch(calendarViewModel.calendarSignInIntent(a))
+                                }
+                            },
+                            onSignOut = { calendarViewModel.signOut() }
+                        )
+                        if (calendarUiState.isSignedIn) {
+                            FilledTonalButton(
+                                onClick = { calendarViewModel.syncAll() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !calendarUiState.isSyncing,
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                if (calendarUiState.isSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                } else {
+                                    Icon(
+                                        Icons.Default.Sync,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Text("Sync habits & tasks")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -89,7 +170,7 @@ fun SettingsScreen(
                     SettingsToggleRow(
                         icon = Icons.Default.CalendarViewWeek,
                         title = "Week starts on Monday",
-                        subtitle = "Affects the heatmap and weekly view",
+                        subtitle = "Affects the calendar week layout",
                         checked = weekStartsMonday,
                         onCheckedChange = { weekStartsMonday = it }
                     )

@@ -14,6 +14,7 @@ import com.google.api.services.calendar.CalendarScopes
 import com.habs.data.preferences.habsPreferencesDataStore
 import com.habs.data.remote.GoogleCalendarApi
 import com.habs.domain.model.Habit
+import com.habs.domain.model.Task
 import com.habs.domain.repository.CalendarRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,12 @@ class CalendarRepositoryImpl @Inject constructor(
         }
 
     override suspend fun removeHabitFromCalendar(calendarEventId: String): Result<Unit> =
+        deleteCalendarEvent(calendarEventId)
+
+    override suspend fun removeTaskFromCalendar(calendarEventId: String): Result<Unit> =
+        deleteCalendarEvent(calendarEventId)
+
+    private suspend fun deleteCalendarEvent(calendarEventId: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 resolveAccountEmail()
@@ -133,6 +140,34 @@ class CalendarRepositoryImpl @Inject constructor(
                         Exception("Sign in with Google and allow Calendar access")
                     )
                 calendarApi.updateEvent(habit)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    override suspend fun syncTaskToCalendar(task: Task): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                resolveAccountEmail()
+                    ?: return@withContext Result.failure(
+                        Exception("Sign in with Google and allow Calendar access")
+                    )
+                val eventId = calendarApi.createTaskEvent(task)
+                Result.success(eventId)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    override suspend fun updateTaskCalendarEvent(task: Task): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                resolveAccountEmail()
+                    ?: return@withContext Result.failure(
+                        Exception("Sign in with Google and allow Calendar access")
+                    )
+                calendarApi.updateTaskEvent(task)
                 Result.success(Unit)
             } catch (e: Exception) {
                 Result.failure(e)

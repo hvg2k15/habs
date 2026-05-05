@@ -44,3 +44,40 @@ interface CompletionDao {
     @Query("DELETE FROM completions WHERE habitId = :habitId AND dateKey = :dateKey")
     suspend fun deleteCompletion(habitId: Long, dateKey: String)
 }
+
+@Dao
+interface TaskDao {
+    @Query(
+        """
+        SELECT * FROM tasks WHERE
+          (isCompleted = 0 AND dueDateKey <= :todayKey)
+          OR (isCompleted = 1 AND completedOnKey = :todayKey)
+        ORDER BY isCompleted ASC, dueDateKey ASC,
+          (CASE WHEN dueTimeMinutes IS NULL THEN 1 ELSE 0 END), dueTimeMinutes ASC,
+          createdAt ASC
+        """
+    )
+    fun observeTasksForTodayWithBacklog(todayKey: String): Flow<List<TaskEntity>>
+
+    @Query(
+        """
+        SELECT * FROM tasks WHERE dueDateKey = :dateKey
+        ORDER BY isCompleted ASC,
+          (CASE WHEN dueTimeMinutes IS NULL THEN 1 ELSE 0 END), dueTimeMinutes ASC,
+          createdAt ASC
+        """
+    )
+    fun observeTasksDueOnDay(dateKey: String): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks ORDER BY dueDateKey ASC, createdAt ASC")
+    fun observeAllTasks(): Flow<List<TaskEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTask(entity: TaskEntity): Long
+
+    @Update
+    suspend fun updateTask(entity: TaskEntity)
+
+    @Delete
+    suspend fun deleteTask(entity: TaskEntity)
+}

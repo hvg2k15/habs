@@ -22,9 +22,22 @@ class SettingsViewModel @Inject constructor(
             true
         )
 
+    val calendarAutoSyncNewTasks: StateFlow<Boolean> =
+        userPreferences.calendarAutoSyncNewTasks.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            true
+        )
+
     fun setCalendarAutoSyncNewHabits(enabled: Boolean) {
         viewModelScope.launch {
             userPreferences.setCalendarAutoSyncNewHabits(enabled)
+        }
+    }
+
+    fun setCalendarAutoSyncNewTasks(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setCalendarAutoSyncNewTasks(enabled)
         }
     }
 }
